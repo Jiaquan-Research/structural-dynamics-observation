@@ -605,7 +605,7 @@ def run_batch(
         return None
 
     results_df = pd.DataFrame(rows)
-    results_df.to_csv("f4_batch_results.csv", index=False, encoding="utf-8")
+    results_df.to_csv(f"f{fault_number}_batch_results.csv", index=False, encoding="utf-8")
 
     relation_trigger_mask = results_df["t_relation_detect"].notna()
     single_trigger_mask = results_df["t_single_alarm"].notna()
@@ -681,7 +681,7 @@ def run_batch(
     axes[2].grid(axis="y", alpha=0.3)
 
     fig.tight_layout()
-    fig.savefig("f4_batch_distributions.png", dpi=150)
+    fig.savefig(f"f{fault_number}_batch_distributions.png", dpi=150)
     plt.close(fig)
 
     return {
@@ -733,6 +733,7 @@ def run_tep_validation():
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "batch":
-        run_batch()
+        fault_num = int(sys.argv[2]) if len(sys.argv) > 2 else 13
+        run_batch(fault_number=fault_num)
     else:
         run_tep_validation()
