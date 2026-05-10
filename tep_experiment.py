@@ -186,6 +186,90 @@ def _pair_switching_rate(top1_indices, sample_times, n_history):
     return np.asarray(switching_values, dtype=float)
 
 
+def _top_pair_rank(top1_indices):
+    """Return the consecutive persistence count for the current top-1 pair."""
+
+    ranks = []
+    streak = 0
+    previous = None
+    for idx in top1_indices:
+        idx = int(idx)
+        if previous is not None and idx == previous:
+            streak += 1
+        else:
+            streak = 1
+        ranks.append(streak)
+        previous = idx
+    return np.asarray(ranks, dtype=int)
+
+
+def compute_pair_entropy(contributions):
+    """Compute pair entropy from one contribution vector."""
+
+    contributions = np.abs(np.asarray(contributions, dtype=float))
+    probs = contributions / (np.sum(contributions) + 1e-10)
+    return float(-np.sum(probs * np.log(probs + 1e-10)))
+
+
+def _pair_entropy_series(contribution_matrix):
+    """Vectorized helper that applies ``compute_pair_entropy`` row-wise."""
+
+    return np.asarray([compute_pair_entropy(row) for row in contribution_matrix], dtype=float)
+
+
+def _regime_labels(switching_values, dominance_values):
+    """Assign regime labels from switching and dominance."""
+
+    labels = []
+    for switching, dominance in zip(switching_values, dominance_values):
+        if switching < 0.15 and dominance > 0.93:
+            labels.append("locked")
+        elif switching > 0.35 and dominance < 0.85:
+            labels.append("diffuse")
+        else:
+            labels.append("transition")
+    return labels
+
+
+def _trajectory_dataframe(fault_id, run_idx, version_b):
+    """Build one trajectory-record DataFrame from Version B outputs."""
+
+    top1_indices = np.asarray(version_b["top1_indices"], dtype=int)
+    top_pair_names = [PAIR_LABELS[idx] for idx in top1_indices]
+    top_pair_rank = _top_pair_rank(top1_indices)
+    sorted_contributions = np.sort(version_b["per_pair_contribution"], axis=1)[:, ::-1]
+    pair_entropy = _pair_entropy_series(version_b["per_pair_contribution"])
+    regime_label = _regime_labels(
+        version_b["pair_switching_rate"], version_b["top_pair_dominance"]
+    )
+
+    return pd.DataFrame(
+        {
+            "fault_id": int(fault_id),
+            "run_idx": int(run_idx),
+            "sample_idx": np.asarray(version_b["sample_times"], dtype=int),
+            "switching": np.asarray(version_b["pair_switching_rate"], dtype=float),
+            "dominance": np.asarray(version_b["top_pair_dominance"], dtype=float),
+            "log_d2": np.log1p(np.asarray(version_b["d2_b"], dtype=float)),
+            "top_pair": top_pair_names,
+            "top_pair_rank": top_pair_rank,
+            "top_pair_contribution": sorted_contributions[:, 0],
+            "top2_pair_contribution": sorted_contributions[:, 1],
+            "top3_pair_contribution": sorted_contributions[:, 2],
+            "pair_entropy": pair_entropy,
+            "d2_raw": np.asarray(version_b["d2_b"], dtype=float),
+            "regime_label": regime_label,
+        }
+    )
+
+
+def _append_trajectory_records(trajectory_df, csv_path="trajectory_records.csv"):
+    """Append trajectory records to a shared CSV, writing header on first create."""
+
+    header = not Path(csv_path).exists()
+    trajectory_df.to_csv(csv_path, mode="a", header=header, index=False)
+
+
 def _load_baseline_and_columns(data_dir="."):
     """Load baseline once and resolve selected columns."""
 
@@ -342,6 +426,7 @@ def _run_version_b_on_fault_run(
     dominance_post = top_pair_dominance[post_fault_mask]
     dominance_pairs_post = np.asarray(dominance_pairs, dtype=object)[post_fault_mask]
     dominant_pair = Counter(dominance_pairs_post.tolist()).most_common(1)[0][0]
+    pair_entropy = _pair_entropy_series(per_pair_contribution)
 
     return {
         "sample_times": sample_times,
@@ -351,6 +436,7 @@ def _run_version_b_on_fault_run(
         "per_pair_contribution": per_pair_contribution,
         "top_pair_dominance": top_pair_dominance,
         "pair_switching_rate": pair_switching_rate,
+        "top1_indices": top1_indices,
         "t_relation_detect": t_relation_detect,
         "t_single_alarm": t_single_alarm,
         "lead_time": lead_time,
@@ -359,6 +445,54 @@ def _run_version_b_on_fault_run(
         "dominant_pair": dominant_pair,
         "d2_post_mean": float(np.mean(d2_b[post_fault_mask])),
         "d2_pre_mean": float(np.mean(d2_b[pre_fault_mask])),
+        "pair_entropy": pair_entropy,
+        "entropy_pre_mean": float(np.mean(pair_entropy[pre_fault_mask])),
+        "entropy_pre_std": float(np.std(pair_entropy[pre_fault_mask], ddof=1)),
+        "entropy_post_mean": float(np.mean(pair_entropy[post_fault_mask])),
+        "entropy_post_std": float(np.std(pair_entropy[post_fault_mask], ddof=1)),
+        "entropy_delta": float(np.mean(pair_entropy[post_fault_mask]) - np.mean(pair_entropy[pre_fault_mask])),
+        "entropy_ratio": float(
+            np.mean(pair_entropy[post_fault_mask]) / (np.mean(pair_entropy[pre_fault_mask]) + 1e-10)
+        ),
+    }
+
+
+def _compute_version_b_trajectory_series(
+    run_data,
+    W,
+    S,
+    k_top,
+    n_history,
+    baseline_model,
+):
+    """Compute Version B trajectory series without requiring a fault onset split."""
+
+    run_range = range(0, len(run_data))
+    fault_times = stride_sample(run_range, W, S)
+    sample_times = np.asarray(fault_times, dtype=int)
+    if len(sample_times) == 0:
+        raise ValueError("No valid windows.")
+
+    features_b = _collect_window_features(
+        run_data, fault_times, W, _differenced_correlation_features
+    )
+    d2_b = _score_features(features_b, baseline_model["mu_b"], baseline_model["s_b_inv"])
+    centered_b = features_b - baseline_model["mu_b"]
+    per_pair_contribution = (centered_b**2) * np.diag(baseline_model["s_b_inv"])
+    _dominance_pairs, top_pair_dominance = _dominance_series(
+        per_pair_contribution, sample_times, k_top=k_top, n_history=n_history
+    )
+    top1_indices = np.argmax(per_pair_contribution, axis=1)
+    pair_switching_rate = _pair_switching_rate(top1_indices, sample_times, n_history=n_history)
+    pair_entropy = _pair_entropy_series(per_pair_contribution)
+    return {
+        "sample_times": sample_times,
+        "d2_b": d2_b,
+        "per_pair_contribution": per_pair_contribution,
+        "top_pair_dominance": top_pair_dominance,
+        "pair_switching_rate": pair_switching_rate,
+        "top1_indices": top1_indices,
+        "pair_entropy": pair_entropy,
     }
 
 
@@ -561,8 +695,11 @@ def run_batch(
     runs = _load_all_fault_runs(testing_path, usecols=usecols, fault_number=fault_number)
 
     print("Running detection...")
+    csv_path = "trajectory_records.csv"
+    print(f"[trajectory] saving records -> {csv_path}")
     rows = []
     skipped_runs = []
+    trajectory_frames = []
     for run_idx in range(1, n_runs + 1):
         if run_idx % 50 == 0:
             print(f"Progress: {run_idx}/500")
@@ -586,6 +723,9 @@ def run_batch(
         except ValueError:
             skipped_runs.append(run_idx)
             continue
+        trajectory_df = _trajectory_dataframe(fault_number, run_idx, version_b)
+        _append_trajectory_records(trajectory_df, csv_path=csv_path)
+        trajectory_frames.append(trajectory_df)
         rows.append(
             {
                 "run_id": int(run_idx),
@@ -597,6 +737,12 @@ def run_batch(
                 "dominant_pair": version_b["dominant_pair"],
                 "d2_post_mean": version_b["d2_post_mean"],
                 "d2_pre_mean": version_b["d2_pre_mean"],
+                "entropy_pre_mean": version_b["entropy_pre_mean"],
+                "entropy_pre_std": version_b["entropy_pre_std"],
+                "entropy_post_mean": version_b["entropy_post_mean"],
+                "entropy_post_std": version_b["entropy_post_std"],
+                "entropy_delta": version_b["entropy_delta"],
+                "entropy_ratio": version_b["entropy_ratio"],
             }
         )
 
@@ -605,6 +751,7 @@ def run_batch(
         return None
 
     results_df = pd.DataFrame(rows)
+    trajectory_records_df = pd.concat(trajectory_frames, axis=0, ignore_index=True)
     results_df.to_csv(f"f{fault_number}_batch_results.csv", index=False, encoding="utf-8")
 
     relation_trigger_mask = results_df["t_relation_detect"].notna()
@@ -650,6 +797,26 @@ def run_batch(
 
     print("-- D2提升比 --")
     print(f"d2_post_mean / d2_pre_mean 的均值 = {np.mean(d2_ratio):.3f}")
+    print("-- regime distribution --")
+    regime_counts = trajectory_records_df["regime_label"].value_counts()
+    print(f"locked: {int(regime_counts.get('locked', 0))}")
+    print(f"transition: {int(regime_counts.get('transition', 0))}")
+    print(f"diffuse: {int(regime_counts.get('diffuse', 0))}")
+    print("-- entropy summary --")
+    print(f"mean_pair_entropy={trajectory_records_df['pair_entropy'].mean():.6f}")
+    print(f"std_pair_entropy={trajectory_records_df['pair_entropy'].std(ddof=1):.6f}")
+    print("-- entropy分布 --")
+    print(
+        f"entropy_post_mean: 均值={results_df['entropy_post_mean'].mean():.6f}, "
+        f"中位数={results_df['entropy_post_mean'].median():.6f}, "
+        f"标准差={results_df['entropy_post_mean'].std(ddof=1):.6f}"
+    )
+    print(f"entropy_post_std 的均值 = {results_df['entropy_post_std'].mean():.6f}")
+    print(
+        f"entropy_delta: 均值={results_df['entropy_delta'].mean():.6f}, "
+        f"中位数={results_df['entropy_delta'].median():.6f}"
+    )
+    print(f"entropy_ratio 的均值 = {results_df['entropy_ratio'].mean():.6f}")
     if skipped_runs:
         print(f"Skipped runs: {len(skipped_runs)}")
 
@@ -694,7 +861,283 @@ def run_batch(
         "lead_time_positive_rate": lead_positive,
         "dominant_pair_counts": dominant_counts,
         "switching_mean_mean": float(np.mean(switching_values)),
+        "trajectory_records": trajectory_records_df,
     }
+
+
+def run_full_scan():
+    """Run batch validation across faults 1..20 and save a summary embedding."""
+
+    summary_rows = []
+    for fault_number in range(1, 21):
+        print(f"\n=== F{fault_number:02d} running ===")
+        result = run_batch(fault_number=fault_number, n_runs=500)
+        if result is None:
+            continue
+
+        df = result["dataframe"]
+        d2_trigger = result["relation_trigger_rate"]
+        switching = float(df["switching_mean"].mean())
+        dominance = float(df["dominance_mean"].mean())
+        d2_ratio = float((df["d2_post_mean"] / df["d2_pre_mean"]).mean())
+        dominant_counts = result["dominant_pair_counts"]
+        dominant_pair, dominant_count = dominant_counts.most_common(1)[0]
+        pair_conc = float(dominant_count / len(df))
+        lead_time_mean = float(df["lead_time"].dropna().mean()) if df["lead_time"].notna().any() else np.nan
+
+        summary_rows.append(
+            {
+                "fault_number": fault_number,
+                "d2_trigger": d2_trigger,
+                "switching_mean": switching,
+                "dominance_mean": dominance,
+                "d2_ratio": d2_ratio,
+                "pair_concentration": pair_conc,
+                "dominant_pair": dominant_pair,
+                "lead_time_mean": lead_time_mean,
+            }
+        )
+
+        print(
+            f"F{fault_number:02d} | "
+            f"D2={d2_trigger:.3f} | "
+            f"sw={switching:.3f} | "
+            f"dom={dominance:.3f} | "
+            f"ratio={d2_ratio:.3f} | "
+            f"conc={pair_conc:.3f} | "
+            f"pair={dominant_pair}"
+        )
+
+    if not summary_rows:
+        print("No scan results produced.")
+        return None
+
+    summary_df = pd.DataFrame(summary_rows).sort_values("fault_number")
+    print("\nFull summary")
+    for row in summary_df.itertuples(index=False):
+        print(
+            f"F{int(row.fault_number):02d} | "
+            f"D2={row.d2_trigger:.3f} | "
+            f"sw={row.switching_mean:.3f} | "
+            f"dom={row.dominance_mean:.3f} | "
+            f"ratio={row.d2_ratio:.3f} | "
+            f"conc={row.pair_concentration:.3f} | "
+            f"pair={row.dominant_pair}"
+        )
+
+    summary_df.to_csv("all_faults_summary.csv", index=False, encoding="utf-8")
+
+    fig, ax = plt.subplots(figsize=(9, 7))
+    sizes = summary_df["d2_trigger"].to_numpy(dtype=float) * 500.0
+    colors = summary_df["d2_ratio"].to_numpy(dtype=float)
+    scatter = ax.scatter(
+        summary_df["switching_mean"],
+        summary_df["dominance_mean"],
+        s=sizes,
+        c=colors,
+        cmap="viridis",
+        alpha=0.85,
+        edgecolors="black",
+        linewidths=0.7,
+    )
+    for row in summary_df.itertuples(index=False):
+        ax.text(
+            float(row.switching_mean) + 0.003,
+            float(row.dominance_mean) + 0.002,
+            f"F{int(row.fault_number)}",
+            fontsize=9,
+        )
+    ax.set_xlabel("switching_mean")
+    ax.set_ylabel("dominance_mean")
+    ax.set_title("All-fault structural embedding")
+    ax.grid(alpha=0.3)
+    fig.colorbar(scatter, ax=ax, label="D2 ratio")
+    fig.tight_layout()
+    fig.savefig("all_faults_embedding.png", dpi=150)
+    plt.close(fig)
+
+    return summary_df
+
+
+def run_normal_entropy(
+    data_dir=".",
+    run_idx=1,
+    W=100,
+    S=10,
+    K_persist=5,
+    k_top=3,
+    n_history=10,
+):
+    """Compute the entropy baseline on fault-free testing run 1."""
+
+    print("Loading data...")
+    loaded = _load_baseline_and_columns(data_dir)
+    if loaded is None:
+        return None
+    _training_path, _testing_path, selected_columns, _usecols, baseline_data = loaded
+
+    print("Building baseline...")
+    baseline_model = _build_baseline_model(baseline_data, W, S)
+
+    normal_candidates = [
+        Path(data_dir) / "fault_free_testing.csv",
+        Path(data_dir) / "Fault_Free_Testing.csv",
+    ]
+    normal_path = next((path for path in normal_candidates if path.exists()), None)
+    if normal_path is None:
+        print("请先从Kaggle下载TEP CSV数据集")
+        return None
+
+    print("Running detection...")
+    normal_df = pd.read_csv(normal_path, usecols=["simulationRun", "sample", *selected_columns])
+    normal_df = normal_df.loc[normal_df["simulationRun"] == run_idx].sort_values("sample")
+    normal_data = normal_df[selected_columns].to_numpy(dtype=float)
+    sample_range = range(0, len(normal_data))
+    sample_times = stride_sample(sample_range, W, S)
+    features = _collect_window_features(normal_data, sample_times, W, _differenced_correlation_features)
+    centered = features - baseline_model["mu_b"]
+    contributions = (centered**2) * np.diag(baseline_model["s_b_inv"])
+    entropy = _pair_entropy_series(contributions)
+
+    print(f"normal_entropy_mean = {float(np.mean(entropy)):.6f}")
+    print(f"normal_entropy_std = {float(np.std(entropy, ddof=1)):.6f}")
+    print(f"normal_entropy_min = {float(np.min(entropy)):.6f}")
+    print(f"normal_entropy_max = {float(np.max(entropy)):.6f}")
+    return entropy
+
+
+def save_trajectory_records(
+    fault_numbers,
+    n_runs=10,
+    output_path="trajectory_records_F0_F4_F13_runs10.csv",
+    data_dir=".",
+    fault_onset=160,
+    W=100,
+    S=10,
+    K_persist=5,
+    k_top=3,
+    n_history=10,
+    threshold_sigma=2.0,
+):
+    """Export per-window structural trajectory records for selected TEP faults/runs."""
+
+    print("Loading data...")
+    loaded = _load_baseline_and_columns(data_dir)
+    if loaded is None:
+        return None
+    _training_path, testing_path, selected_columns, usecols, baseline_data = loaded
+
+    print("Building baseline...")
+    baseline_model = _build_baseline_model(baseline_data, W, S)
+
+    normal_candidates = [
+        Path(data_dir) / "fault_free_testing.csv",
+        Path(data_dir) / "Fault_Free_Testing.csv",
+    ]
+    normal_path = next((path for path in normal_candidates if path.exists()), None)
+    if 0 in fault_numbers and normal_path is None:
+        print("请先从Kaggle下载TEP CSV数据集")
+        return None
+
+    normal_runs = {}
+    if 0 in fault_numbers:
+        normal_df = pd.read_csv(normal_path, usecols=["simulationRun", "sample", *selected_columns])
+        for run_id, run_df in normal_df.groupby("simulationRun", sort=True):
+            normal_runs[int(run_id)] = run_df.sort_values("sample")
+
+    fault_run_map = {}
+    for fault_number in fault_numbers:
+        if fault_number == 0:
+            continue
+        fault_run_map[fault_number] = _load_all_fault_runs(
+            testing_path, usecols=usecols, fault_number=fault_number
+        )
+
+    output_rows = []
+    row_counts = Counter()
+    for fault_number in fault_numbers:
+        if fault_number == 0:
+            fault_label = "NORMAL"
+            runs = normal_runs
+        else:
+            fault_label = f"F{int(fault_number):02d}"
+            runs = fault_run_map[fault_number]
+
+        for run_idx in range(1, n_runs + 1):
+            print(f"{fault_label} run {run_idx}/{n_runs}...")
+            run_df = runs.get(run_idx)
+            if run_df is None:
+                continue
+
+            run_data = run_df[selected_columns].to_numpy(dtype=float)
+            try:
+                if fault_number == 0:
+                    version_b = _compute_version_b_trajectory_series(
+                        run_data,
+                        W,
+                        S,
+                        k_top,
+                        n_history,
+                        baseline_model,
+                    )
+                else:
+                    version_b = _run_version_b_on_fault_run(
+                        run_data,
+                        fault_onset,
+                        W,
+                        S,
+                        K_persist,
+                        k_top,
+                        n_history,
+                        baseline_model,
+                        threshold_sigma=threshold_sigma,
+                    )
+            except ValueError:
+                continue
+
+            contributions = np.asarray(version_b["per_pair_contribution"], dtype=float)
+            top1_indices = np.asarray(version_b["top1_indices"], dtype=int)
+            entropy_values = np.asarray(version_b["pair_entropy"], dtype=float)
+            entropy_raw_values = np.sum(np.abs(contributions), axis=1)
+            top_pairs = [PAIR_LABELS[idx] for idx in top1_indices]
+
+            for idx, sample in enumerate(version_b["sample_times"]):
+                # ``sample`` is the window end index t for the window data[t-W:t].
+                output_rows.append(
+                    {
+                        "fault_number": int(fault_number),
+                        "fault_label": fault_label,
+                        "run_id": int(run_idx),
+                        "sample": int(sample),
+                        "switching": float(version_b["pair_switching_rate"][idx]),
+                        "dominance": float(version_b["top_pair_dominance"][idx]),
+                        "log_d2": float(np.log1p(version_b["d2_b"][idx])),
+                        "entropy": float(entropy_values[idx]),
+                        "entropy_raw": float(entropy_raw_values[idx]),
+                        "top_pair": top_pairs[idx],
+                        "top_pair_idx": int(top1_indices[idx]),
+                    }
+                )
+            row_counts[fault_label] += len(version_b["sample_times"])
+
+    if not output_rows:
+        print("No trajectory records produced.")
+        return None
+
+    records_df = pd.DataFrame(output_rows)
+    records_df.to_csv(output_path, index=False, encoding="utf-8")
+
+    print(output_path)
+    print(f"Total rows = {len(records_df)}")
+    for fault_number in fault_numbers:
+        fault_label = "NORMAL" if fault_number == 0 else f"F{int(fault_number):02d}"
+        print(f"{fault_label} rows = {int(row_counts.get(fault_label, 0))}")
+    if n_runs <= 10:
+        print("Columns:")
+        print(records_df.columns.tolist())
+        print("Preview:")
+        print(records_df.head().to_string(index=False))
+    return records_df
 
 
 def run_tep_validation():
@@ -732,8 +1175,24 @@ def run_tep_validation():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "batch":
-        fault_num = int(sys.argv[2]) if len(sys.argv) > 2 else 13
-        run_batch(fault_number=fault_num)
+    mode = sys.argv[1] if len(sys.argv) > 1 else "single"
+    if mode == "batch":
+        if len(sys.argv) > 2 and str(sys.argv[2]).lower() == "all":
+            for fault_num in range(1, 21):
+                print(f"\n=== F{fault_num:02d} running ===")
+                run_batch(fault_number=fault_num)
+        else:
+            fault_num = int(sys.argv[2]) if len(sys.argv) > 2 else 13
+            run_batch(fault_number=fault_num)
+    elif mode == "records":
+        save_trajectory_records(
+            fault_numbers=[0, 4, 13],
+            n_runs=500,
+            output_path="trajectory_records_F0_F4_F13_runs500.csv",
+        )
+    elif mode == "normal":
+        run_normal_entropy()
+    elif mode == "scan":
+        run_full_scan()
     else:
         run_tep_validation()
