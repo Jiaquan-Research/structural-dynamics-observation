@@ -59,6 +59,23 @@ def compute_transition_entropy(trans_matrix):
     return float(-np.sum(masked[positive] * np.log(masked[positive] + 1e-10)))
 
 
+def compute_stationary(trans_matrix):
+    """Compute stationary distribution via power iteration."""
+
+    n_states = trans_matrix.shape[0]
+    pi = np.ones(n_states, dtype=float) / float(n_states)
+    row_sums = trans_matrix.sum(axis=1, keepdims=True)
+    safe_matrix = np.asarray(trans_matrix, dtype=float).copy()
+    zero_rows = row_sums[:, 0] == 0
+    if np.any(zero_rows):
+        safe_matrix[zero_rows] = 1.0 / float(n_states)
+
+    for _ in range(1000):
+        pi = pi @ safe_matrix
+        pi = pi / max(pi.sum(), 1e-12)
+    return pi
+
+
 def _active_submatrix(trans_matrix):
     """Return active rows/cols only for plotting."""
 
@@ -129,6 +146,36 @@ def _plot_entropy_bars(entropies, output_path):
     plt.close(fig)
 
 
+def _plot_stationary_distributions(stationary_map, output_path):
+    fig, axes = plt.subplots(3, 1, figsize=(12, 14), constrained_layout=True)
+
+    for ax, fault_label in zip(axes, FAULT_ORDER):
+        stationary = stationary_map[fault_label]
+        top_idx = int(np.argmax(stationary))
+        bars = ax.bar(PAIR_LABELS, stationary, color=FAULT_COLORS[fault_label], alpha=0.85)
+        ax.axhline(0.1, color="black", linestyle="--", linewidth=1.0, label="uniform=0.1")
+        ax.set_ylabel("occupancy probability")
+        ax.set_xticks(np.arange(len(PAIR_LABELS)))
+        ax.set_xticklabels(PAIR_LABELS, rotation=45, ha="right")
+        ax.set_title(
+            f"{fault_label}: max={PAIR_LABELS[top_idx]} ({stationary[top_idx]:.3f})"
+        )
+        ax.grid(axis="y", alpha=0.3)
+
+        for bar, value in zip(bars, stationary):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                bar.get_height(),
+                f"{value:.2f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+
 def main():
     input_path = Path(INPUT_PATH)
     if not input_path.exists():
@@ -139,19 +186,30 @@ def main():
 
     matrices = {}
     entropies = {}
+    stationary_map = {}
     for fault_label in FAULT_ORDER:
         df_fault = df.loc[df["fault_label"] == fault_label].copy()
         matrix = build_transition_matrix(df_fault)
         entropy = compute_transition_entropy(matrix)
+        stationary = compute_stationary(matrix)
         matrices[fault_label] = matrix
         entropies[fault_label] = entropy
+        stationary_map[fault_label] = stationary
 
     _plot_transition_heatmaps(matrices, entropies, "transition_heatmap.png")
     _plot_entropy_bars(entropies, "transition_entropy_comparison.png")
+    _plot_stationary_distributions(stationary_map, "stationary_distribution.png")
 
     print(f"NORMAL transition entropy = {entropies['NORMAL']:.3f}")
     print(f"F04    transition entropy = {entropies['F04']:.3f}")
     print(f"F13    transition entropy = {entropies['F13']:.3f}")
+
+    for fault_label in FAULT_ORDER:
+        stationary = stationary_map[fault_label]
+        top3_idx = np.argsort(stationary)[::-1][:3]
+        print(f"{fault_label} stationary top-3:")
+        for idx in top3_idx:
+            print(f"  {PAIR_LABELS[int(idx)]}: {stationary[int(idx)]:.3f}")
 
 
 if __name__ == "__main__":
