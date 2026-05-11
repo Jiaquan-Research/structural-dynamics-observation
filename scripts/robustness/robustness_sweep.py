@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 from collections import Counter
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,6 +28,9 @@ from tep_experiment import (
     _load_all_fault_runs,
     _load_baseline_and_columns,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
 
 
 W_VALUES = [80, 100, 150]
@@ -220,7 +224,8 @@ def main():
             )
 
     summary_df = pd.DataFrame(rows)
-    summary_df.to_csv("robustness_summary.csv", index=False, encoding="utf-8")
+    (OUTPUT_ROOT / "csv").mkdir(parents=True, exist_ok=True)
+    summary_df.to_csv(OUTPUT_ROOT / "csv" / "robustness_summary.csv", index=False, encoding="utf-8")
 
     taxonomy_rows = []
     for fault_number, group in summary_df.groupby("fault_number", sort=True):
@@ -244,8 +249,8 @@ def main():
         )
 
     taxonomy_df = pd.DataFrame(taxonomy_rows).sort_values("fault_number")
-    taxonomy_df.to_csv("robustness_taxonomy.csv", index=False, encoding="utf-8")
-    _plot_robustness(summary_df, taxonomy_df, "robustness_stability.png")
+    taxonomy_df.to_csv(OUTPUT_ROOT / "csv" / "robustness_taxonomy.csv", index=False, encoding="utf-8")
+    _plot_robustness(summary_df, taxonomy_df, OUTPUT_ROOT / "taxonomy" / "robustness_stability.png")
 
     for row in taxonomy_df.itertuples(index=False):
         label = "NORMAL" if int(row.fault_number) == 0 else f"F{int(row.fault_number):02d}"

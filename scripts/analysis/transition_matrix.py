@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
+
 PAIR_LABELS = [
     "XMEAS7-XMEAS8",
     "XMEAS7-XMEAS9",
@@ -21,7 +24,7 @@ PAIR_LABELS = [
     "XMEAS10-XMEAS11",
 ]
 
-INPUT_PATH = "trajectory_records_F0_F4_F13_runs500.csv"
+INPUT_PATH = OUTPUT_ROOT / "csv" / "trajectory_records_F0_F4_F13_runs500.csv"
 FAULT_ORDER = ["NORMAL", "F04", "F13"]
 FAULT_COLORS = {"NORMAL": "gray", "F04": "tab:orange", "F13": "tab:blue"}
 
@@ -196,9 +199,9 @@ def main():
         entropies[fault_label] = entropy
         stationary_map[fault_label] = stationary
 
-    _plot_transition_heatmaps(matrices, entropies, "transition_heatmap.png")
-    _plot_entropy_bars(entropies, "transition_entropy_comparison.png")
-    _plot_stationary_distributions(stationary_map, "stationary_distribution.png")
+    _plot_transition_heatmaps(matrices, entropies, OUTPUT_ROOT / "taxonomy" / "transition_heatmap.png")
+    _plot_entropy_bars(entropies, OUTPUT_ROOT / "taxonomy" / "transition_entropy_comparison.png")
+    _plot_stationary_distributions(stationary_map, OUTPUT_ROOT / "taxonomy" / "stationary_distribution.png")
 
     print(f"NORMAL transition entropy = {entropies['NORMAL']:.3f}")
     print(f"F04    transition entropy = {entropies['F04']:.3f}")

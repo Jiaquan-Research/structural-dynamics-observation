@@ -12,7 +12,20 @@ import numpy as np
 import pandas as pd
 from sklearn.covariance import LedoitWolf
 
+SCRIPTS_ROOT = Path(__file__).resolve().parents[1]
+for _name in ("analysis", "tep", "visualization", "robustness"):
+    _path = str(SCRIPTS_ROOT / _name)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 from task0_protocol import stride_sample
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = PROJECT_ROOT / "data" / "raw"
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
+CSV_OUTPUT_DIR = OUTPUT_ROOT / "csv"
+TRAJECTORY_OUTPUT_DIR = OUTPUT_ROOT / "trajectories"
+TAXONOMY_OUTPUT_DIR = OUTPUT_ROOT / "taxonomy"
 
 VARIABLE_SPECS = [
     ("XMEAS_7", "reactor pressure"),
@@ -47,7 +60,7 @@ assert PAIR_LABELS == expected_pairs, f"PAIR_LABELS mismatch: {PAIR_LABELS} vs {
 def _resolve_paths(data_dir="."):
     """Resolve TEP CSV paths with case-insensitive fallbacks."""
 
-    directory = Path(data_dir)
+    directory = DATA_ROOT if Path(data_dir) == Path(".") else Path(data_dir)
     training_candidates = [
         directory / "fault_free_training.csv",
         directory / "Fault_Free_Training.csv",
@@ -263,10 +276,12 @@ def _trajectory_dataframe(fault_id, run_idx, version_b):
     )
 
 
-def _append_trajectory_records(trajectory_df, csv_path="trajectory_records.csv"):
+def _append_trajectory_records(trajectory_df, csv_path=None):
     """Append trajectory records to a shared CSV, writing header on first create."""
 
-    header = not Path(csv_path).exists()
+    csv_path = CSV_OUTPUT_DIR / "trajectory_records.csv" if csv_path is None else Path(csv_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    header = not csv_path.exists()
     trajectory_df.to_csv(csv_path, mode="a", header=header, index=False)
 
 
@@ -591,6 +606,7 @@ def run_tep_experiment(
 def save_tep_figures(results, output_dir="."):
     """Save the requested TEP validation figures."""
 
+    output_dir = TRAJECTORY_OUTPUT_DIR if output_dir == "." else Path(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
     print("Saving figures...")
@@ -695,7 +711,7 @@ def run_batch(
     runs = _load_all_fault_runs(testing_path, usecols=usecols, fault_number=fault_number)
 
     print("Running detection...")
-    csv_path = "trajectory_records.csv"
+    csv_path = CSV_OUTPUT_DIR / "trajectory_records.csv"
     print(f"[trajectory] saving records -> {csv_path}")
     rows = []
     skipped_runs = []
@@ -752,7 +768,8 @@ def run_batch(
 
     results_df = pd.DataFrame(rows)
     trajectory_records_df = pd.concat(trajectory_frames, axis=0, ignore_index=True)
-    results_df.to_csv(f"f{fault_number}_batch_results.csv", index=False, encoding="utf-8")
+    CSV_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    results_df.to_csv(CSV_OUTPUT_DIR / f"f{fault_number}_batch_results.csv", index=False, encoding="utf-8")
 
     relation_trigger_mask = results_df["t_relation_detect"].notna()
     single_trigger_mask = results_df["t_single_alarm"].notna()
@@ -848,7 +865,8 @@ def run_batch(
     axes[2].grid(axis="y", alpha=0.3)
 
     fig.tight_layout()
-    fig.savefig(f"f{fault_number}_batch_distributions.png", dpi=150)
+    TRAJECTORY_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    fig.savefig(TRAJECTORY_OUTPUT_DIR / f"f{fault_number}_batch_distributions.png", dpi=150)
     plt.close(fig)
 
     return {
@@ -925,7 +943,8 @@ def run_full_scan():
             f"pair={row.dominant_pair}"
         )
 
-    summary_df.to_csv("all_faults_summary.csv", index=False, encoding="utf-8")
+    CSV_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    summary_df.to_csv(CSV_OUTPUT_DIR / "all_faults_summary.csv", index=False, encoding="utf-8")
 
     fig, ax = plt.subplots(figsize=(9, 7))
     sizes = summary_df["d2_trigger"].to_numpy(dtype=float) * 500.0
@@ -953,7 +972,8 @@ def run_full_scan():
     ax.grid(alpha=0.3)
     fig.colorbar(scatter, ax=ax, label="D2 ratio")
     fig.tight_layout()
-    fig.savefig("all_faults_embedding.png", dpi=150)
+    TAXONOMY_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    fig.savefig(TAXONOMY_OUTPUT_DIR / "all_faults_embedding.png", dpi=150)
     plt.close(fig)
 
     return summary_df
@@ -980,8 +1000,8 @@ def run_normal_entropy(
     baseline_model = _build_baseline_model(baseline_data, W, S)
 
     normal_candidates = [
-        Path(data_dir) / "fault_free_testing.csv",
-        Path(data_dir) / "Fault_Free_Testing.csv",
+        (DATA_ROOT if Path(data_dir) == Path(".") else Path(data_dir)) / "fault_free_testing.csv",
+        (DATA_ROOT if Path(data_dir) == Path(".") else Path(data_dir)) / "Fault_Free_Testing.csv",
     ]
     normal_path = next((path for path in normal_candidates if path.exists()), None)
     if normal_path is None:
@@ -1031,8 +1051,8 @@ def save_trajectory_records(
     baseline_model = _build_baseline_model(baseline_data, W, S)
 
     normal_candidates = [
-        Path(data_dir) / "fault_free_testing.csv",
-        Path(data_dir) / "Fault_Free_Testing.csv",
+        (DATA_ROOT if Path(data_dir) == Path(".") else Path(data_dir)) / "fault_free_testing.csv",
+        (DATA_ROOT if Path(data_dir) == Path(".") else Path(data_dir)) / "Fault_Free_Testing.csv",
     ]
     normal_path = next((path for path in normal_candidates if path.exists()), None)
     if 0 in fault_numbers and normal_path is None:
@@ -1125,6 +1145,8 @@ def save_trajectory_records(
         return None
 
     records_df = pd.DataFrame(output_rows)
+    output_path = CSV_OUTPUT_DIR / Path(output_path).name
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     records_df.to_csv(output_path, index=False, encoding="utf-8")
 
     print(output_path)

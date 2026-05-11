@@ -20,8 +20,10 @@ from fault_stationary_scan import (
 )
 from tep_experiment import PAIR_LABELS, _build_baseline_model, _load_all_fault_runs, _load_baseline_and_columns
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
 
-SUMMARY_PATH = "fault_stationary_summary.csv"
+SUMMARY_PATH = OUTPUT_ROOT / "csv" / "fault_stationary_summary.csv"
 REPRESENTATIVE_FAULTS = [0, 13, 12, 14]
 TYPICAL_MASS_TARGET = 0.80
 
@@ -248,9 +250,10 @@ def main():
         }
 
     summary_df = pd.DataFrame(summary_rows)
-    summary_df.to_csv("attractor_subgraph_summary.csv", index=False, encoding="utf-8")
-    _plot_taxonomy(summary_df, "attractor_taxonomy.png")
-    _plot_representative_subgraphs(graph_payloads, "attractor_subgraphs.png")
+    (OUTPUT_ROOT / "csv").mkdir(parents=True, exist_ok=True)
+    summary_df.to_csv(OUTPUT_ROOT / "csv" / "attractor_subgraph_summary.csv", index=False, encoding="utf-8")
+    _plot_taxonomy(summary_df, OUTPUT_ROOT / "taxonomy" / "attractor_taxonomy.png")
+    _plot_representative_subgraphs(graph_payloads, OUTPUT_ROOT / "taxonomy" / "attractor_subgraphs.png")
     return summary_df
 
 

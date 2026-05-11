@@ -16,6 +16,9 @@ from tep_experiment import (
     _load_baseline_and_columns,
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = PROJECT_ROOT / "data" / "raw"
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
 
 FAULT_NUMBERS = [0] + list(range(1, 21))
 W = 100
@@ -69,8 +72,8 @@ def build_transition_matrix(counts):
 
 def _load_normal_runs(data_dir, selected_columns):
     normal_candidates = [
-        Path(data_dir) / "fault_free_testing.csv",
-        Path(data_dir) / "Fault_Free_Testing.csv",
+        (DATA_ROOT if Path(data_dir) == Path(".") else Path(data_dir)) / "fault_free_testing.csv",
+        (DATA_ROOT if Path(data_dir) == Path(".") else Path(data_dir)) / "Fault_Free_Testing.csv",
     ]
     normal_path = next((path for path in normal_candidates if path.exists()), None)
     if normal_path is None:
@@ -243,11 +246,12 @@ def main():
         )
 
     summary_df = pd.DataFrame(summary_rows)
-    summary_df.to_csv("fault_stationary_summary.csv", index=False, encoding="utf-8")
+    (OUTPUT_ROOT / "csv").mkdir(parents=True, exist_ok=True)
+    summary_df.to_csv(OUTPUT_ROOT / "csv" / "fault_stationary_summary.csv", index=False, encoding="utf-8")
 
     occupancy_matrix = np.column_stack(occupancy_columns)
-    _plot_stationary_heatmap(summary_df, occupancy_matrix, "fault_stationary_heatmap.png")
-    _plot_taxonomy(summary_df, "fault_taxonomy.png")
+    _plot_stationary_heatmap(summary_df, occupancy_matrix, OUTPUT_ROOT / "taxonomy" / "fault_stationary_heatmap.png")
+    _plot_taxonomy(summary_df, OUTPUT_ROOT / "taxonomy" / "fault_taxonomy.png")
     return summary_df
 
 

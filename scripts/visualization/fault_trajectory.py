@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+SCRIPTS_ROOT = Path(__file__).resolve().parents[1]
+for _name in ("analysis", "tep", "visualization", "robustness"):
+    _path = str(SCRIPTS_ROOT / _name)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = PROJECT_ROOT / "data" / "raw"
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
 
 from tep_experiment import (
     _load_baseline_and_columns,
@@ -24,8 +37,8 @@ def _resolve_fault_free_testing_path():
     """Resolve the fault-free testing CSV path with case-insensitive fallbacks."""
 
     candidates = [
-        "fault_free_testing.csv",
-        "Fault_Free_Testing.csv",
+        str(DATA_ROOT / "fault_free_testing.csv"),
+        str(DATA_ROOT / "Fault_Free_Testing.csv"),
     ]
     for candidate in candidates:
         try:
@@ -45,15 +58,18 @@ def save_fault_trajectory(
     K_persist=5,
     k_top=3,
     n_history=10,
-    output_path="fault_trajectory.png",
+    output_path=None,
 ):
     """Generate the requested 3-panel fault trajectory figure."""
 
+    if output_path is None:
+        output_path = OUTPUT_ROOT / "trajectories" / "fault_trajectory.png"
     loaded = _load_baseline_and_columns(".")
     if loaded is None:
         return None
     _training_path, testing_path, selected_columns, usecols, baseline_data = loaded
     baseline_model = _build_baseline_model(baseline_data, W, S)
+    records_path = OUTPUT_ROOT / "csv" / "trajectory_records.csv"
     normal_testing_path = _resolve_fault_free_testing_path()
     if normal_testing_path is None:
         print("请先从Kaggle下载TEP CSV数据集")
@@ -88,33 +104,50 @@ def save_fault_trajectory(
     }
 
     trajectories = {}
+    records_df = None
+    if records_path.exists():
+        records_df = pd.read_csv(records_path)
     for fault_number in faults_to_plot:
-        fault_df, first_run = _stream_fault_run_csv(
-            testing_path, usecols=usecols, fault_number=fault_number
-        )
-        if int(first_run) != run_idx:
-            raise ValueError(
-                f"Requested run_idx={run_idx}, but first available run for fault {fault_number} "
-                f"is {first_run}."
+        if records_df is not None:
+            fault_records = records_df.loc[
+                (records_df["fault_id"] == fault_number) & (records_df["run_idx"] == run_idx)
+            ].sort_values("sample_idx")
+        else:
+            fault_records = pd.DataFrame()
+        if not fault_records.empty:
+            trajectories[fault_number] = {
+                "sample_times": fault_records["sample_idx"].to_numpy(dtype=int),
+                "switching": fault_records["switching"].to_numpy(dtype=float),
+                "dominance": fault_records["dominance"].to_numpy(dtype=float),
+                "log_d2": fault_records["log_d2"].to_numpy(dtype=float),
+            }
+        else:
+            fault_df, first_run = _stream_fault_run_csv(
+                testing_path, usecols=usecols, fault_number=fault_number
             )
-        fault_data = fault_df[selected_columns].to_numpy(dtype=float)
-        version_b = _run_version_b_on_fault_run(
-            fault_data,
-            fault_onset,
-            W,
-            S,
-            K_persist,
-            k_top,
-            n_history,
-            baseline_model,
-            threshold_sigma=2.0,
-        )
-        trajectories[fault_number] = {
-            "sample_times": version_b["sample_times"],
-            "switching": version_b["pair_switching_rate"],
-            "dominance": version_b["top_pair_dominance"],
-            "log_d2": np.log1p(version_b["d2_b"]),
-        }
+            if int(first_run) != run_idx:
+                raise ValueError(
+                    f"Requested run_idx={run_idx}, but first available run for fault {fault_number} "
+                    f"is {first_run}."
+                )
+            fault_data = fault_df[selected_columns].to_numpy(dtype=float)
+            version_b = _run_version_b_on_fault_run(
+                fault_data,
+                fault_onset,
+                W,
+                S,
+                K_persist,
+                k_top,
+                n_history,
+                baseline_model,
+                threshold_sigma=2.0,
+            )
+            trajectories[fault_number] = {
+                "sample_times": version_b["sample_times"],
+                "switching": version_b["pair_switching_rate"],
+                "dominance": version_b["top_pair_dominance"],
+                "log_d2": np.log1p(version_b["d2_b"]),
+            }
 
     colors = {8: "tab:blue", 13: "tab:orange", 19: "tab:green"}
 

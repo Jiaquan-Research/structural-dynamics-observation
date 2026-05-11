@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
+
 PAIR_LABELS = [
     "XMEAS7-XMEAS8",
     "XMEAS7-XMEAS9",
@@ -77,9 +80,9 @@ def load_trajectory_records():
     """Load and standardize all available trajectory_records*.csv files."""
 
     candidates = [
-        Path("trajectory_records_F0_F4_F13_runs500.csv"),
-        Path("trajectory_records_F0_F4_F13_runs10.csv"),
-        Path("trajectory_records.csv"),
+        OUTPUT_ROOT / "csv" / "trajectory_records_F0_F4_F13_runs500.csv",
+        OUTPUT_ROOT / "csv" / "trajectory_records_F0_F4_F13_runs10.csv",
+        OUTPUT_ROOT / "csv" / "trajectory_records.csv",
     ]
     existing = [path for path in candidates if path.exists()]
     if not existing:
@@ -247,8 +250,9 @@ def main():
 
     summary_df = pd.DataFrame(summary_rows).sort_values("fault_number").reset_index(drop=True)
     summary_df_csv = summary_df.drop(columns=["segment_lengths"])
-    summary_df_csv.to_csv("basin_escape_summary.csv", index=False, encoding="utf-8")
-    _plot_taxonomy(summary_df, "basin_escape_taxonomy.png")
+    (OUTPUT_ROOT / "csv").mkdir(parents=True, exist_ok=True)
+    summary_df_csv.to_csv(OUTPUT_ROOT / "csv" / "basin_escape_summary.csv", index=False, encoding="utf-8")
+    _plot_taxonomy(summary_df, OUTPUT_ROOT / "taxonomy" / "basin_escape_taxonomy.png")
 
     for row in summary_df.itertuples(index=False):
         label = _fault_label(row.fault_number)
