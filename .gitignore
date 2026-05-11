@@ -1,6 +1,8 @@
 # Generated experiment artifacts live under outputs/ and are excluded by default.
 # Important milestone figures or results can still be force-added manually when needed.
 outputs/
+# Raw TEP source datasets are kept locally under data/raw/ and are not tracked by default.
+data/raw/
 __pycache__/
 *.pyc
 report_render_tmp/
