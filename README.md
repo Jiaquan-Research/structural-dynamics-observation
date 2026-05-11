@@ -30,6 +30,11 @@ Current observations:
 * `outputs/`: generated figures, CSV summaries, taxonomy plots, and trajectory artifacts
 * `data/`: raw and processed datasets
 
+Raw datasets are intentionally excluded from git tracking.
+
+TEP datasets must be obtained separately
+by the user due to repository hygiene and size constraints.
+
 ## Key Documents
 
 * [RESEARCH_AUDIT_PACKAGE_V1.md](RESEARCH_AUDIT_PACKAGE_V1.md)

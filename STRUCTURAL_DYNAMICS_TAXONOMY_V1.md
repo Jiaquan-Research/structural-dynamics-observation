@@ -134,7 +134,7 @@ structural dynamics observation.
 
 # 4. Structural Taxonomy
 
-Experiments consistently revealed three major structural regimes.
+Experiments consistently revealed three major low-dimensional structural regimes within the original 5-variable observation window.
 
 ---
 
@@ -207,7 +207,7 @@ typical edge count ≈ 2–4
 
 ---
 
-## 4.3 Single-Edge Attractor
+## 4.3 Low-Dimensional Concentration Regime
 
 Representative faults:
 
@@ -218,8 +218,8 @@ Representative faults:
 
 Characteristics:
 
-* near-single-edge topology
-* extremely high occupancy
+* highly localized low-dimensional concentration
+* extremely high occupancy within the original observation window
 * long residence time
 * near-zero escape rate
 * high return probability
@@ -227,8 +227,9 @@ Characteristics:
 Interpretation:
 
 ```text
-The system collapses into a dominant relational mode.
-Pair-space exploration effectively disappears.
+Within the original low-dimensional pair-space,
+the system collapses into a strongly concentrated relational mode.
+Pair-space exploration is greatly reduced.
 ```
 
 Typical values:
@@ -240,7 +241,7 @@ escape rate ≈ 0.003–0.01
 typical edge count = 1
 ```
 
-This is quantitatively supported by:
+Within the original 5-variable setup, this is quantitatively supported by:
 
 ```text
 typical_edge_count = 1
@@ -248,7 +249,7 @@ across essentially all parameter settings
 for F06/F08/F13/F14.
 ```
 
-These regimes emerged without supervised labeling.
+These regimes emerged without supervised labeling in the original low-dimensional observation window.
 
 ---
 
@@ -260,15 +261,15 @@ Instead of using a fixed probability threshold, each fault retained only the sma
 
 This avoided threshold arbitrariness and produced topology-adaptive graphs.
 
-Observed structures:
+Observed low-dimensional structures:
 
 | Regime                | Typical topology        |
 | --------------------- | ----------------------- |
 | diffuse wandering     | dense transition graph  |
 | metastable basin      | sparse multi-edge basin |
-| single-edge attractor | near-self-loop collapse |
+| low-dimensional concentration regime | near-self-loop collapse |
 
-Particularly:
+Particularly in the original 5-variable pair-space:
 
 ```text
 F06/F08/F13/F14
@@ -304,13 +305,13 @@ Results:
 Interpretation:
 
 ```text
-Strong attractors were highly robust.
+Strong low-dimensional concentration regimes were highly robust within the tested low-dimensional setting.
 Diffuse wandering was also robust.
 Metastable basins were partially parameter-sensitive.
-F18 behaved as a boundary case between metastable and strong-locking regimes.
+F18 behaved as a boundary case between metastable and stronger concentration regimes.
 ```
 
-This suggests the taxonomy is not purely a parameter artifact.
+This suggests the original low-dimensional taxonomy is not purely a parameter artifact, although it does not establish dimensional invariance.
 
 ---
 
@@ -327,7 +328,7 @@ Three quantities were especially informative:
 Results showed:
 
 ```text
-single-edge attractors
+the strongest low-dimensional concentration regimes
 not only had high occupancy,
 but also deep temporal persistence.
 ```
@@ -340,7 +341,7 @@ Representative examples:
 | F13    | 0.810     | 38.7           | 0.012  |
 | NORMAL | 0.238     | 3.1            | 0.316  |
 
-This supports the interpretation that some faults generate genuine dynamic basins rather than static statistical concentration.
+This supports the interpretation that some faults generate genuine dynamic concentration patterns rather than purely static statistical concentration, within the current low-dimensional observation window.
 
 ---
 
@@ -366,6 +367,10 @@ The current attractor geometry should therefore be interpreted as:
 a low-dimensional structural projection,
 not a full industrial state manifold.
 ```
+
+A4 variable-expansion validation further showed that concentration weakens as pair-space grows.
+The strongest single-edge-style regimes do not remain invariant under dimensional expansion.
+The taxonomy should therefore currently be interpreted as a low-dimensional observational framework rather than a scale-invariant system topology.
 
 ---
 
@@ -442,15 +447,15 @@ Future validation must therefore occur on real marine subsystem telemetry.
 
 # 10. Conclusion
 
-This work demonstrates that industrial process faults can produce distinct pair-space structural dynamics regimes.
+This work demonstrates that industrial process faults can produce distinct low-dimensional pair-space structural dynamics regimes.
 
 Across TEP experiments:
 
 * diffuse wandering
 * metastable basins
-* single-edge attractors
+* low-dimensional concentration regimes
 
-emerged naturally from unsupervised transition dynamics.
+emerged naturally from unsupervised transition dynamics within the original observation window.
 
 The results suggest that:
 
@@ -467,5 +472,7 @@ The current work should be viewed as:
 a structural dynamics observation framework,
 not yet an industrial deployment system.
 ```
+
+The framework currently demonstrates persistent concentration effects under several validation settings, but dimensional robustness remains incomplete.
 
 The next major milestone is validation on real marine engineering telemetry.
