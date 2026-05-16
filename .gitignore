@@ -3,6 +3,8 @@
 outputs/
 # Raw TEP source datasets are kept locally under data/raw/ and are not tracked by default.
 data/raw/
+data/raw_backup_tmp_keep_local/
+.venv312/
 __pycache__/
 *.pyc
 report_render_tmp/

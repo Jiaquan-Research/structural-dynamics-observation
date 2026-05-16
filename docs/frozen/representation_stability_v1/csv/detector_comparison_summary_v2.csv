@@ -1,0 +1,6 @@
+detector,input_signal,fp_rate,mean_detection_rate,mean_delay,detector_type,strong_fault_count,moderate_fault_count,weak_fault_count,insensitive_fault_count,notes
+T2,trajectory_window_52vars,0.0008571428571428,0.6186,3.0821209182023925,pca_t2,12,1,0,7,"low FP, misses hard faults, gaussian assumption violated"
+SPE,trajectory_window_52vars,0.3214285714285714,0.8592000000000001,3.322392923649907,pca_spe,16,4,0,0,"high coverage, FP=32%, trajectory flattening artifact"
+top1_mass,XMEAS7-11_correlation,0.0445714285714285,0.2519,5.368797141722906,geometry_locking,2,4,12,2,"geometry locking detector, selective, FP floor=2.5%"
+ruptures_A,XMEAS7+XMEAS11_raw,0.004,0.3152,2.0948948184733185,ruptures_raw,5,3,1,11,"raw signal changepoint, piecewise-stationary bias"
+ruptures_B,XMEAS7-XMEAS11_rolling_corr,0.014,0.048900000000000006,2.835460381205288,ruptures_rolling_corr,0,1,4,15,"coupling statistics changepoint, very low coverage"

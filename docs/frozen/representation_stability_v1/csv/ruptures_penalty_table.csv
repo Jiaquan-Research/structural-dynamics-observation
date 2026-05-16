@@ -1,0 +1,5 @@
+version,fp_target,penalty,actual_fp_rate,detector_type
+Version A,0.01,50.0,0.004,ruptures_raw
+Version A,0.05,50.0,0.004,ruptures_raw
+Version B,0.01,200.0,0.014,ruptures_rolling_corr
+Version B,0.05,200.0,0.014,ruptures_rolling_corr

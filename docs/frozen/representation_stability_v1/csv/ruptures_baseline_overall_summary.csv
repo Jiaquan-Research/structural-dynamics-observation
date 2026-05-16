@@ -1,0 +1,5 @@
+version,fp_target,actual_fp_rate,mean_detection_rate,mean_delay,penalty_used,detector_type
+Version A,0.01,0.004,0.3152,2.0948948184733185,50.0,ruptures_raw
+Version A,0.05,0.004,0.3152,2.0948948184733185,50.0,ruptures_raw
+Version B,0.01,0.014,0.048900000000000006,2.835460381205288,200.0,ruptures_rolling_corr
+Version B,0.05,0.014,0.048900000000000006,2.835460381205288,200.0,ruptures_rolling_corr

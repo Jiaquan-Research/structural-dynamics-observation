@@ -1,0 +1,4 @@
+fault,run_id,mean_run_length,max_run_length,pair_switch_count,occupancy_ratio,pair_entropy,unique_pair_count,dominant_pair,dominant_pair_frequency
+F02,366,1.1666666666666667,2,5,0.2857142857142857,1.351783994289646,4,XMEAS8-XMEAS11,0.2857142857142857
+F06,164,7.0,7,0,1.0,0.0,1,XMEAS7-XMEAS11,1.0
+F14,150,7.0,7,0,1.0,0.0,1,XMEAS7-XMEAS11,1.0
