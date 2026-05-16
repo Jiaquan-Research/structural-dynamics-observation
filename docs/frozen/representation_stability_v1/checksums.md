@@ -1,0 +1,18 @@
+﻿# Frozen Snapshot Checksums
+
+Snapshot: representation_stability_v1
+Algorithm: SHA256
+
+| File | SHA256 |
+|---|---|
+| docs/frozen/representation_stability_v1/csv/representation_audit_500runs_summary.csv | 9439FD940724878C992F1649BA832B313C17B2A4AC8AEA3A7950935828F97051 |
+| docs/frozen/representation_stability_v1/csv/representation_audit_500runs_perrun.csv | 72D83455FAA5A543E2886B41F9E433F43B140F6142B039B98F0B9F61E8E6616A |
+| docs/frozen/representation_stability_v1/csv/fault_detector_response_matrix.csv | 6256DED22DAC5FD67E153997FA34BF96F26B0D6B5B9FE71C4F85D8F35B7030CE |
+| docs/frozen/representation_stability_v1/csv/detector_comparison_summary_v2.csv | B531C534234E7398E64DD54DE630068917D7C493A051CF04ECB06992ECE3A467 |
+| docs/frozen/representation_stability_v1/csv/ruptures_baseline_overall_summary.csv | DE6C6619ECA1F8ECB04F6507BE1952E5FEF7439DDA521B572AD9C5A8DDBCF623 |
+| docs/frozen/representation_stability_v1/csv/ruptures_baseline_fault_summary.csv | 5AB2BBFFB2FC1D18EDFC181BD708F827CB2E54EEE9F162C46A54FE77ECACE87D |
+| docs/frozen/representation_stability_v1/figures/representation_500runs_scatter.png | 3D41B52367A67CAD0E0069C57D568C0D59396F9DCA1B0FDCA0B49B882739A27A |
+| docs/frozen/representation_stability_v1/figures/representation_occupancy_distribution.png | 8B55C298E7C2AD622744EFDF7DA440040D4C84282E636EF644052B13B0A5E33C |
+| docs/frozen/representation_stability_v1/figures/representation_occupancy_consistency.png | B136578E646602D41AA1F2375CA29C8BAD4FFEC23E858A2A854513ADCA55693E |
+| docs/frozen/representation_stability_v1/figures/archetype_triangle_comparison.png | 4C941F1BD9E3308E0159E5EE7FE4B6C6035C8B8A30C6EABDD53D77BF8B2A7E27 |
+| docs/frozen/representation_stability_v1/figures/detector_disagreement_heatmap.png | C964FE9123819C0BC399FAC392092C8744DB64DB79F066B2DD52125D6DB8E225 |
