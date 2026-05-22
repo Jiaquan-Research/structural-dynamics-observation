@@ -1,0 +1,4 @@
+mode,requested_block,relock_rate,median_relock_time_windows,median_relock_time_samples,mean_recovered_lock,mean_residual_damage,status
+block_3,3,0.84,10.0,100.0,14.22,0.7078869954400312,ROBUST
+block_5,5,0.84,10.0,100.0,13.48,0.7241507045846294,ROBUST
+block_10,10,0.84,10.0,100.0,11.52,0.7675139845915915,ROBUST

@@ -1,0 +1,4 @@
+mode,requested_block,relock_rate,median_relock_time_windows,median_relock_time_samples,mean_recovery_horizon,mean_horizon_margin,n_horizon_limited,status
+block_15,15,0.82,10.0,100.0,26.428571428571427,2.642857142857143,3,ROBUST
+block_20,20,0.78,10.0,100.0,23.80952380952381,2.380952380952381,5,ROBUST
+block_30,30,0.68,10.0,100.0,18.904761904761905,1.8904761904761906,8,DEGRADED

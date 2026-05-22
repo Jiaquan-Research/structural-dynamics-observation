@@ -1,0 +1,7 @@
+mode,strength,n_eligible,trigger_rate,median_delay,delay_shift,miss_rate,NORMAL_FPR,survival_score,status
+baseline,none,50,1.0,110.0,0.0,0.0,0.0,0.6333333333333333,ROBUST
+double_break,2,42,1.0,165.0,55.0,0.0,0.0,0.44999999999999996,ROBUST
+noise_replay,10%,42,1.0,150.0,40.0,0.0,0.0,0.5,ROBUST
+noise_replay,20%,42,1.0,150.0,40.0,0.0,0.0,0.5,ROBUST
+noise_replay,5%,42,1.0,150.0,40.0,0.0,0.0,0.5,ROBUST
+single_break,1,42,1.0,150.0,40.0,0.0,0.0,0.5,ROBUST
